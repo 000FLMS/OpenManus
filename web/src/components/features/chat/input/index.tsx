@@ -43,18 +43,6 @@ export const ChatInput = ({ status = 'idle', onSubmit, onTerminate, taskId }: Ch
 
   const currentModel = useMemo(() => llmConfigs?.find(c => c.id === selectedModel), [llmConfigs, selectedModel]);
 
-  const handleKeyDown = async (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      if (status === 'thinking' || status === 'terminating' || !value.trim()) {
-        return;
-      }
-      await onSubmit?.({ modelId: selectedModel, prompt: value.trim(), tools: selectedTools, files, shouldPlan });
-      setValue('');
-      setFiles([]);
-    }
-  };
-
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       setFiles(Array.from(e.target.files));
