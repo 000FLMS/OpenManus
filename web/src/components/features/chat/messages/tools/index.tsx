@@ -3,6 +3,7 @@ import { AggregatedMessage, Message } from '@/lib/chat-messages/types';
 import { getImageUrl } from '@/lib/image';
 import Image from 'next/image';
 import { usePreviewData } from '../../preview/store';
+import { useEffect } from 'react';
 
 type ToolCall = {
   id: string;
@@ -29,6 +30,13 @@ export const ToolMessageContent = ({ message }: { message: AggregatedMessage & {
   const toolSelectedMessage = thinkMessage?.messages.find(
     (msg): msg is Message => 'type' in msg && msg.type === 'agent:lifecycle:step:think:tool:selected',
   ) as (AggregatedMessage & { type: 'agent:lifecycle:step:think:tool:selected' }) | undefined;
+
+  useEffect(() => {
+    if (toolSelectedMessage?.content.tool_calls && toolSelectedMessage.content.tool_calls.length > 0) {
+      const lastToolCall = toolSelectedMessage.content.tool_calls[toolSelectedMessage.content.tool_calls.length - 1];
+      setData({ type: 'tool', toolId: lastToolCall.id });
+    }
+  }, [toolSelectedMessage]);
 
   const browserMessage = thinkMessage?.messages.find(
     (msg): msg is Message => 'type' in msg && msg.type === 'agent:lifecycle:step:think:browser:browse:complete',

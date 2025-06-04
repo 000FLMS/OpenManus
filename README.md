@@ -53,7 +53,8 @@ cd OpenManus
 
 ```bash
 uv venv --python 3.12
-source .venv/bin/activate  # Unix/macOS 系统
+source .venv/bin/activate.fish
+# Unix/macOS 系统
 # Windows 系统使用：
 # .venv\Scripts\activate
 
