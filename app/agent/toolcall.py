@@ -12,6 +12,7 @@ from app.schema import TOOL_CHOICE_TYPE, AgentState, Message, ToolCall, ToolChoi
 from app.tool import CreateChatCompletion, Terminate, ToolCollection
 from app.tool.base import BaseTool
 from app.tool.mcp import MCPToolCallHost
+from app.utils.text_utils import sanitize_string_for_json
 
 # Avoid circular import if BrowserAgent needs BrowserContextHelper
 if TYPE_CHECKING:
@@ -118,6 +119,7 @@ class ToolCallContextHelper:
             response.tool_calls if response and response.tool_calls else []
         )
         content = response.content if response and response.content else ""
+        content = sanitize_string_for_json(content)
 
         # Log response info
         logger.info(f"✨ {self.agent.name}'s thoughts: {content}")

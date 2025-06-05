@@ -26,6 +26,7 @@ from app.logger import logger
 from app.memory import Memory
 from app.sandbox.client import SANDBOX_CLIENT
 from app.schema import ROLE_TYPE, AgentState, Message
+from app.utils.text_utils import sanitize_string_for_json
 
 EventHandler = Callable[..., Coroutine[Any, Any, None]]
 
@@ -447,10 +448,13 @@ class BaseAgent(BaseModel, ABC):
                     return result
                 except Exception as e:
                     # Prepare error event data
+                    sanitized_error_str = sanitize_string_for_json(str(e))
                     error_data = {
                         **event_data,
-                        "error": str(e),
-                        "message": f"Error in {method_name} #{current_count}: {str(e)}",
+                        "error": sanitized_error_str,
+                        "message": sanitize_string_for_json(
+                            f"Error in {method_name} #{current_count}: {str(e)}"
+                        ),
                     }
 
                     # Emit error event

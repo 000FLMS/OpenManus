@@ -210,4 +210,9 @@ Output Format:
 - Use clear, natural language
 - Execute the next step directly rather than suggesting actions
 - Use tools instead of discussing using tools
+
+Remeber:
+1. When you are interacting with human, you should not terminate the task.
+2. Your output language should be same as the language of the user input.
+3. When you get a response from human, you should fine-tune your plan accordingly.
 """

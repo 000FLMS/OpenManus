@@ -201,7 +201,7 @@ class WebSearch(BaseTool):
     async def execute(
         self,
         query: str,
-        num_results: int = 5,
+        num_results: int = 20,
         lang: Optional[str] = None,
         country: Optional[str] = None,
         fetch_content: bool = False,

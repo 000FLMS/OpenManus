@@ -6,6 +6,7 @@ from typing import List, Optional, Union, cast
 
 from fastapi import APIRouter, Body, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
+from pydantic import BaseModel
 
 from app.agent.base import BaseAgentEvents
 from app.agent.manus import Manus, McpToolConfig
@@ -17,6 +18,12 @@ from app.logger import logger
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 AGENT_NAME = "Manus"
+MAX_STEPS = 40
+TEST_STEP_INPUT = True  # Set to True to test step input handling
+
+
+class ResumeTaskInput(BaseModel):
+    input: str
 
 
 async def handle_agent_event(task_id: str, event_name: str, step: int, **kwargs):
@@ -62,6 +69,18 @@ async def run_task(task_id: str, prompt: str):
                 ),
             )
 
+        if TEST_STEP_INPUT:
+            # Add a specific handler for agent_paused_for_input to ensure it's caught
+            agent.on(
+                "agent_paused_for_input",
+                lambda event_name, step, **kwargs: handle_agent_event(
+                    task_id=task_id,
+                    event_name=event_name,  # Will be "agent_paused_for_input"
+                    step=step,
+                    **{k: v for k, v in kwargs.items() if k != "task_id"},
+                ),
+            )
+
         # Run the agent
         await agent.run(prompt)
         await agent.cleanup()
@@ -79,6 +98,45 @@ async def event_generator(task_id: str):
     while True:
         try:
             event = await asyncio.wait_for(queue.get(), timeout=10)
+
+            # ==== DEBUGGING: Log the raw event structure and specific fields ====
+            try:
+                if (
+                    isinstance(event, dict)
+                    and event.get("kwargs")
+                    and isinstance(event["kwargs"], dict)
+                ):
+                    thoughts = event["kwargs"].get("thoughts")
+                    if thoughts:
+                        # Log the thoughts string with each character's ordinal value
+                        # This helps identify non-standard characters.
+                        logger.info(f"DEBUG: Event thoughts pre-dumps: '{thoughts}'")
+                        logger.info(
+                            f"DEBUG: Event thoughts ordinals: {[ord(c) for c in thoughts]}"
+                        )
+
+                    error_in_kwargs = event["kwargs"].get("error")
+                    if error_in_kwargs:
+                        logger.info(
+                            f"DEBUG: Event error_in_kwargs pre-dumps: '{error_in_kwargs}'"
+                        )
+                        logger.info(
+                            f"DEBUG: Event error_in_kwargs ordinals: {[ord(c) for c in error_in_kwargs]}"
+                        )
+
+                    message_in_kwargs = event["kwargs"].get("message")
+                    if message_in_kwargs:
+                        logger.info(
+                            f"DEBUG: Event message_in_kwargs pre-dumps: '{message_in_kwargs}'"
+                        )
+                        logger.info(
+                            f"DEBUG: Event message_in_kwargs ordinals: {[ord(c) for c in message_in_kwargs]}"
+                        )
+
+            except Exception as e_debug:
+                logger.info(f"DEBUG: Error during debug logging: {str(e_debug)}")
+            # ==== END DEBUGGING ====
+
             formatted_event = dumps(event)
 
             if not event.get("type"):
@@ -101,7 +159,7 @@ async def event_generator(task_id: str):
             yield f"event: error\ndata: {dumps({'message': str(e)})}\n\n"
             break
     # Remove the task from the task manager
-    await task_manager.remove_task(task_id)
+    # await task_manager.remove_task(task_id)
 
 
 def parse_tools(tools: list[str]) -> list[Union[str, McpToolConfig]]:
@@ -174,7 +232,7 @@ async def create_task(
         Manus(
             name=AGENT_NAME,
             description="A versatile agent that can solve various tasks using multiple tools",
-            should_plan=should_plan,
+            should_plan=True,
             llm=(
                 LLM(config_name=task_id, llm_config=llm_config_obj)
                 if llm_config_obj
@@ -189,6 +247,7 @@ async def create_task(
         language=(
             preferences_dict.get("language", "English") if preferences_dict else None
         ),
+        max_steps=MAX_STEPS,
         tools=processed_tools,
         task_request=prompt,
     )
@@ -203,6 +262,7 @@ async def create_task(
             )
         )
         task_dir.mkdir(parents=True, exist_ok=True)
+        task_dir.chmod(0o777)
         for file in files or []:
             print(task_dir)
             print(file.filename)
@@ -335,6 +395,7 @@ async def restart_task(
         language=(
             preferences_dict.get("language", "English") if preferences_dict else None
         ),
+        max_steps=MAX_STEPS,
         tools=processed_tools,
         task_request=prompt,
     )
@@ -342,8 +403,13 @@ async def restart_task(
     if files:
         import os
 
-        task_dir = Path(os.path.join(config.workspace_root, task.agent.task_dir))
+        task_dir = Path(
+            os.path.join(
+                config.workspace_root, task.agent.task_dir.replace("/workspace/", "")
+            )
+        )
         task_dir.mkdir(parents=True, exist_ok=True)
+        task_dir.chmod(0o777)
 
         for file in files or []:
             file = cast(UploadFile, file)

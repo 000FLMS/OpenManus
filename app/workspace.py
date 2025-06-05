@@ -4,6 +4,7 @@ from typing import Union
 
 from app.config import config
 from app.exceptions import ToolError
+from app.logger import logger
 
 PathLike = Union[str, Path]
 
@@ -23,5 +24,6 @@ def resolve_path(path: PathLike) -> Path:
 
     resolved = Path(config.workspace_root / path_str.replace("/workspace/", ""))
     if not resolved.parent.exists():
+        logger.info(f"Creating directory: {resolved.parent}")
         os.makedirs(resolved.parent, exist_ok=True)
     return resolved
