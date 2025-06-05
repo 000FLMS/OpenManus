@@ -32,13 +32,27 @@ export const StepBadge = ({ message }: { message: AggregatedMessage & { type: 'a
     (msg): msg is Message => 'type' in msg && msg.type === 'agent:lifecycle:step:act:token:count',
   ) as AggregatedMessage & { type: 'agent:lifecycle:step:act:token:count' };
 
-  const stepCount = stepStartMessage?.content.count || 0;
-
   const input = (thinkTokenCountMessage?.content.input || 0) + (actTokenCountMessage?.content.input || 0);
   const completion = (thinkTokenCountMessage?.content.completion || 0) + (actTokenCountMessage?.content.completion || 0);
 
   const totalInput = (actTokenCountMessage ?? thinkTokenCountMessage)?.content.total_input || 0;
   const totalCompletion = (actTokenCountMessage ?? thinkTokenCountMessage)?.content.total_completion || 0;
+
+  // Get the current phase based on messages
+  const getCurrentPhase = () => {
+    if (!thinkMessage) return 'Initializing...';
+    if (!actMessage) return 'Thinking...';
+    if (!stepCompleteMessage) return 'Acting...';
+    return 'Completed';
+  };
+
+  // Get emoji based on current phase
+  const getPhaseEmoji = () => {
+    if (!thinkMessage) return '⚡';
+    if (!actMessage) return '🤔';
+    if (!stepCompleteMessage) return '⚙️';
+    return '✨';
+  };
 
   return (
     <div className="text-muted-foreground mt-2 mb-2 font-mono text-xs">
@@ -50,12 +64,12 @@ export const StepBadge = ({ message }: { message: AggregatedMessage & { type: 'a
           >
             {stepCompleteMessage ? (
               <>
-                🚀 Step {stepCount} ({formatNumber(input, { autoUnit: true })} input; {formatNumber(completion, { autoUnit: true })} completion)
+                ✨ Task {getCurrentPhase()} ({formatNumber(input, { autoUnit: true })} input; {formatNumber(completion, { autoUnit: true })} completion)
               </>
             ) : (
               <>
-                <span className="thinking-animation">🤔</span>
-                <span>Step {stepCount} Thinking...</span>
+                <span className={!stepCompleteMessage ? 'thinking-animation' : ''}>{getPhaseEmoji()}</span>
+                <span>{getCurrentPhase()}</span>
                 <span>
                   Token Usage: {formatNumber(input, { autoUnit: true })} input; {formatNumber(completion, { autoUnit: true })} completion
                 </span>

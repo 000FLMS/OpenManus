@@ -12,7 +12,13 @@ interface ChatMessageProps {
   messages: AggregatedMessage[];
 }
 
-const UserMessage = ({ message }: { message: Message<{ request: string }> }) => <Markdown className="chat">{message.content.request}</Markdown>;
+const UserMessage = ({ message }: { message: Message<{ request: string }> }) => (
+  <div className="container mx-auto flex max-w-4xl justify-end">
+    <div className="bg-primary/10 rounded-lg max-w-[80%]">
+      <Markdown className="chat">{typeof message.content === 'string' ? message.content : message.content.request}</Markdown>
+    </div>
+  </div>
+);
 
 const PrepareMessage = ({ message }: { message: AggregatedMessage & { type: 'agent:lifecycle:prepare' } }) => {
   const prepareCompleteMessage = message.messages.find(msg => msg.type === 'agent:lifecycle:prepare:complete') as
@@ -168,12 +174,8 @@ const LifecycleMessage = ({ message }: { message: AggregatedMessage }) => {
         if (!('type' in msg)) return null;
 
         // 处理生命周期开始
-        if (msg.type === 'agent:lifecycle:start') {
-          return (
-            <div key={index} className="container mx-auto flex max-w-4xl justify-end">
-              <UserMessage message={msg as Message<{ request: string }>} />
-            </div>
-          );
+        if (msg.type === 'agent:lifecycle:start' || msg.type === 'agent:lifecycle:interaction') {
+          return <UserMessage key={index} message={msg as Message<{ request: string }>} />;
         }
 
         if (msg.type === 'agent:lifecycle:prepare') {

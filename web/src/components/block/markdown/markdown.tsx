@@ -4,7 +4,9 @@ import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import remarkGfm from 'remark-gfm';
 
-export const Markdown: React.FC<{ children: string | null; className?: string }> = ({ children, className }) => {
+export const Markdown: React.FC<{ children: unknown; className?: string }> = ({ children, className }) => {
+  console.log('children', children);
+  const content = typeof children === 'string' ? children : '';
   return (
     <div className={cn('markdown-body mt-2 rounded-md p-4', className)}>
       <ReactMarkdown
@@ -20,7 +22,7 @@ export const Markdown: React.FC<{ children: string | null; className?: string }>
           },
         }}
       >
-        {children}
+        {content}
       </ReactMarkdown>
     </div>
   );

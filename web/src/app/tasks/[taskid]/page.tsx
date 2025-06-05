@@ -1,6 +1,6 @@
 'use client';
 
-import { getTask, restartTask, terminateTask } from '@/actions/tasks';
+import { getTask, restartTask, terminateTask, resumeTask } from '@/actions/tasks';
 import { ChatInput } from '@/components/features/chat/input';
 import { ChatMessages } from '@/components/features/chat/messages';
 import { ChatPreview } from '@/components/features/chat/preview';
@@ -22,6 +22,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isThinking, setIsThinking] = useState(false);
   const [isTerminating, setIsTerminating] = useState(false);
+  const [isPausedForInput, setIsPausedForInput] = useState(false);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -74,17 +75,20 @@ export default function ChatPage() {
   useEffect(() => {
     setPreviewData(null);
     if (!taskId) return;
-    refreshTask();
+    if (!isPausedForInput) {
+      refreshTask();
+    }
   }, [taskId]);
 
   useEffect(() => {
-    refreshTask();
-    if (!taskId || !isThinking) return;
+    if (!taskId || !isThinking || isPausedForInput) {
+      return;
+    }
     const interval = setInterval(refreshTask, 2000);
     return () => {
       clearInterval(interval);
     };
-  }, [taskId, isThinking, shouldAutoScroll]);
+  }, [taskId, isThinking, isPausedForInput, shouldAutoScroll]);
 
   useEffect(() => {
     if (shouldAutoScroll) {
@@ -99,6 +103,42 @@ export default function ChatPage() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage.type === 'agent_paused_for_input') {
+        setIsPausedForInput(true);
+        setIsThinking(false);
+        console.log('Agent is paused for input');
+      } else if (isPausedForInput && lastMessage.role === 'user') {
+        setIsPausedForInput(false);
+      }
+    }
+  }, [messages, isPausedForInput]);
+
+  const handleResumeWithInput = async (userInput: string) => {
+    if (!taskId || !isPausedForInput) return;
+
+
+
+    try {
+      const response = await resumeTask({ taskId, input: userInput });
+      if (response.error) {
+        throw new Error(response.error);
+      }
+      // Refresh the task to get the latest messages
+      await refreshTask();
+      setIsPausedForInput(false);
+      setIsThinking(true);
+      router.refresh();
+
+    } catch (error) {
+      toast.error(`Failed to send input: ${error instanceof Error ? error.message : String(error)}`);
+      setIsPausedForInput(true);
+      setIsThinking(false);
+    }
+  };
 
   const handleSubmit = async (value: { modelId: string; prompt: string; tools: string[]; files: File[]; shouldPlan: boolean }) => {
     try {
@@ -120,6 +160,11 @@ export default function ChatPage() {
     }
   };
 
+  const handleTerminateTask = async () => {
+    await terminateTask({ taskId });
+    router.refresh();
+  };
+
   return (
     <div className="flex h-screen w-full flex-row justify-between">
       <div className="flex-1">
@@ -136,13 +181,10 @@ export default function ChatPage() {
             <ChatMessages messages={aggregateMessages(messages)} />
           </div>
           <ChatInput
-            status={isThinking ? 'thinking' : isTerminating ? 'terminating' : 'completed'}
-            onSubmit={handleSubmit}
-            onTerminate={async () => {
-              await terminateTask({ taskId });
-              router.refresh();
-            }}
             taskId={taskId}
+            status={isTerminating ? 'terminating' : isThinking ? 'thinking' : isPausedForInput ? 'paused' : 'idle'}
+            onSubmit={isPausedForInput ? async ({ prompt }) => handleResumeWithInput(prompt) : handleSubmit}
+            onTerminate={handleTerminateTask}
           />
         </div>
       </div>

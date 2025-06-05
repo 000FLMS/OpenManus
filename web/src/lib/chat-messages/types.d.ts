@@ -39,8 +39,10 @@ type AgentLifecycleType =
   | 'agent:lifecycle:plan:complete'
   | 'agent:lifecycle:memory:added'
   | 'agent:lifecycle:state:change'
+  | 'agent_paused_for_input'
   | 'agent:lifecycle:complete'
-  | 'agent:lifecycle:terminated';
+  | 'agent:lifecycle:terminated'
+  | 'agent:lifecycle:interaction';
 
 type AggregatedMessageType =
   | 'agent:lifecycle'
@@ -50,7 +52,8 @@ type AggregatedMessageType =
   | 'agent:lifecycle:step:think'
   | 'agent:lifecycle:step:act'
   | 'agent:lifecycle:step:act:tool'
-  | 'agent:lifecycle:step:act:browser';
+  | 'agent:lifecycle:step:act:browser'
+  | 'agent:lifecycle:interaction';
 
 /**
  * agent:step:start

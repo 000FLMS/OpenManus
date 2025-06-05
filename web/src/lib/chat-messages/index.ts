@@ -47,6 +47,14 @@ class ChatMessageAggregator {
         continue;
       }
 
+      // Handle interaction messages
+      if (message.type === 'agent:lifecycle:interaction') {
+        if (currentLifecycle && 'messages' in currentLifecycle) {
+          currentLifecycle.messages.push(message);
+        }
+        continue;
+      }
+
       // Handle plan messages
       if (message.type?.startsWith('agent:lifecycle:plan')) {
         if (message.type === 'agent:lifecycle:plan:start') {

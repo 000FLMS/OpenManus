@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma';
 import { to } from '@/lib/to';
 import fs from 'fs';
 import path from 'path';
+import fsPromises from 'fs/promises';
 
 const MANUS_URL = process.env.MANUS_URL || 'http://localhost:5172';
 
@@ -42,6 +43,8 @@ type CreateTaskArgs = {
 };
 export const createTask = withUserAuth(async ({ organization, args }: AuthWrapperContext<CreateTaskArgs>) => {
   const { modelId, prompt, tools, files, shouldPlan } = args;
+  console.log('createTask', args);
+  console.log('organization', organization);
   const llmConfig = await prisma.llmConfigs.findUnique({ where: { id: modelId, organizationId: organization.id } });
 
   if (!llmConfig) throw new Error('LLM config not found');
@@ -221,7 +224,7 @@ export const restartTask = withUserAuth(
     );
     formData.append('history', JSON.stringify(history));
     files.forEach(file => formData.append('files', file));
-
+    console.log(formData);
     const [error, response] = await to(
       fetch(`${MANUS_URL}/tasks/restart`, {
         method: 'POST',
@@ -264,6 +267,77 @@ export const terminateTask = withUserAuth(async ({ organization, args }: AuthWra
 
   await prisma.tasks.update({ where: { id: taskId, organizationId: organization.id }, data: { status: 'terminated' } });
 });
+
+export const resumeTask = withUserAuth(
+  async ({ organization, args }: AuthWrapperContext<{ taskId: string; input: string }>) => {
+    const { taskId, input } = args;
+
+    // Ensure the task exists and belongs to the organization.
+    const existingTask = await prisma.tasks.findUnique({
+      where: { id: taskId, organizationId: organization.id },
+      include: {
+        progresses: {
+          orderBy: { index: 'desc' },
+          take: 1,
+        },
+      }
+    });
+    if (!existingTask) {
+      throw new Error('Task not found or not authorized');
+    }
+
+    // Store the user input in the database
+    const lastProgress = existingTask.progresses[0];
+    const newProgress = await prisma.taskProgresses.create({
+      data: {
+        taskId: taskId,
+        organizationId: organization.id,
+        type: 'agent:lifecycle:interaction',
+        content: { request: input },
+        index: (lastProgress?.index || 0) + 1,
+        round: lastProgress?.round || 0,
+        step: (lastProgress?.step || 0) + 1,
+      },
+    });
+
+    // Update task status to processing
+    await prisma.tasks.update({
+      where: { id: taskId },
+      data: { status: 'processing' }
+    });
+
+    // The Python API endpoint is /tasks/resume with organization_id and task_id as query parameters.
+    const [error, response] = await to(
+      fetch(`${MANUS_URL}/tasks/resume?organization_id=${organization.id}&task_id=${taskId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ input }), // FastAPI route expects ResumeTaskInput(input: str)
+      }).then(async res => {
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({ detail: res.statusText }));
+          throw new Error(`Error resuming task: ${errorData.detail || res.statusText}`);
+        }
+        return res.json() as Promise<{ message: string; task_id: string }>;
+      })
+    );
+
+    if (error) {
+      // Update task status to failed if there's an error
+      await prisma.tasks.update({
+        where: { id: taskId },
+        data: { status: 'failed' }
+      });
+      throw error;
+    }
+
+    // Handle event stream in background
+    handleTaskEvents(taskId, response.task_id, organization.id).catch(error => {
+      console.error('Failed to handle task events:', error);
+    });
+
+    return { id: taskId, outId: response.task_id };
+  }
+);
 
 export const shareTask = withUserAuth(async ({ organization, args }: AuthWrapperContext<{ taskId: string; expiresAt: number }>) => {
   const { taskId, expiresAt } = args;
@@ -308,6 +382,23 @@ export const deleteTask = withUserAuth(async ({ organization, args }: AuthWrappe
   await prisma.tasks.delete({
     where: { id: taskId }
   });
+
+  // Delete the task directory from the workspace
+  const workspaceDir = process.env.WORKSPACE_ROOT_PATH;
+  if (workspaceDir) {
+    const taskDirPath = path.join(workspaceDir, organization.id, taskId);
+    try {
+      await fsPromises.rm(taskDirPath, { recursive: true, force: true });
+      console.log(`Successfully deleted task directory: ${taskDirPath}`);
+    } catch (error) {
+      console.error(`Failed to delete task directory ${taskDirPath}:`, error);
+      // Decide if this error should be propagated or just logged
+      // For now, we'll log it and let the operation be considered successful
+      // as the primary goal (DB deletion) was achieved.
+    }
+  } else {
+    console.warn('WORKSPACE_DIR environment variable is not set. Cannot delete task directory.');
+  }
 
   return { success: true };
 });
