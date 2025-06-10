@@ -215,7 +215,9 @@ class DockerSandbox:
 
             # Create parent directory
             if parent_dir:
-                await self.run_command(f"mkdir -p {parent_dir}")
+                await self.run_command(
+                    f"mkdir -p {parent_dir} && chmod -R 777 {parent_dir}"
+                )
 
             # Prepare file data
             tar_stream = await self._create_tar_stream(
@@ -332,7 +334,9 @@ class DockerSandbox:
             resolved_dst = self._safe_resolve_path(dst_path)
             container_dir = os.path.dirname(resolved_dst)
             if container_dir:
-                await self.run_command(f"mkdir -p {container_dir}")
+                await self.run_command(
+                    f"mkdir -p {container_dir} && chmod -R 777 {container_dir}"
+                )
 
             # Create tar file to upload
             with tempfile.TemporaryDirectory() as tmp_dir:

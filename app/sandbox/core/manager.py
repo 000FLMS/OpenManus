@@ -144,6 +144,8 @@ class SandboxManager:
                     sandbox_id, config, volume_bindings, environment
                 )
                 await sandbox.create()
+                await sandbox.run_command("apt-get update")
+                await sandbox.run_command("apt-get install -y git")
 
                 self._sandboxes[sandbox_id] = sandbox
                 self._last_used[sandbox_id] = asyncio.get_event_loop().time()

@@ -268,8 +268,8 @@ class DockerSession:
             "mkfs",
             "dd if=/dev/zero",
             ":(){:|:&};:",
-            "chmod -R 777 /",
-            "chown -R",
+            # "chmod -R 777 /",
+            # "chown -R",
         ]
 
         for risky in risky_commands:
@@ -375,7 +375,9 @@ class AsyncDockerizedTerminal:
             RuntimeError: If directory creation fails.
         """
         try:
-            await self._exec_simple(f"mkdir -p {self.working_dir}")
+            await self._exec_simple(
+                f"bash -c 'mkdir -p {self.working_dir} && chmod 777 {self.working_dir}'"
+            )
         except APIError as e:
             raise RuntimeError(f"Failed to create working directory: {e}")
 

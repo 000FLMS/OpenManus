@@ -1,8 +1,8 @@
 FROM python:3.12-slim
 
 RUN apt-get update \
-    # Install curl, ca-certificates and unzip
-    && apt-get install -y --no-install-recommends curl ca-certificates unzip \
+    # Install curl, ca-certificates, unzip, and git
+    && apt-get install -y --no-install-recommends curl ca-certificates unzip git \
     # Install Node.js 20.x
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \

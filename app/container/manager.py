@@ -43,6 +43,8 @@ class ContainerManager:
     def _ensure_data_dir(self):
         """Ensure container data directory exists."""
         Path(self.container_data_dir).mkdir(parents=True, exist_ok=True)
+        os.chmod(self.container_data_dir, 0o777)
+        logger.info(f"Container data directory set to: {self.container_data_dir}")
 
     async def create_container(self, config: ContainerConfig) -> str:
         """Create a new container with security constraints."""
@@ -53,7 +55,8 @@ class ContainerManager:
             # Create container data directory
             container_dir = Path(self.container_data_dir) / container_name
             container_dir.mkdir(parents=True, exist_ok=True)
-
+            os.chmod(container_dir, 0o777)
+            logger.info(f"Creating container directory: {container_dir}")
             # Prepare volumes
             volumes = {str(container_dir): {"bind": "/data", "mode": "rw"}}
             volumes.update(config.volumes)
