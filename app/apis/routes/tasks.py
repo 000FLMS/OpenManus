@@ -19,7 +19,7 @@ router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 AGENT_NAME = "Manus"
 MAX_STEPS = 40
-TEST_STEP_INPUT = True  # Set to True to test step input handling
+TEST_STEP_INPUT = False  # Set to True to test step input handling
 
 
 class ResumeTaskInput(BaseModel):
@@ -232,7 +232,7 @@ async def create_task(
         Manus(
             name=AGENT_NAME,
             description="A versatile agent that can solve various tasks using multiple tools",
-            should_plan=True,
+            should_plan=should_plan,
             llm=(
                 LLM(config_name=task_id, llm_config=llm_config_obj)
                 if llm_config_obj

@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any, List
 from app.agent.base import BaseAgent, BaseAgentEvents
 from app.exceptions import TokenLimitExceeded
 from app.logger import logger
+from app.prompt.toolcall import SYSTEM_PROMPT
 from app.schema import TOOL_CHOICE_TYPE, AgentState, Message, ToolCall, ToolChoice
 from app.tool import CreateChatCompletion, Terminate, ToolCollection
 from app.tool.base import BaseTool
@@ -56,12 +57,13 @@ class ToolCallContextHelper:
         self.available_tools.add_tool(tool)
 
     async def add_mcp(self, tool: dict) -> None:
+        logger.info(f"Adding MCP tool: {tool}")
         """Add a new MCP client to the available tools collection."""
         if (
             isinstance(tool, dict)
             and "client_id" in tool
             and "url" in tool
-            and tool["url"]
+            and tool["url"].startswith("http")
         ):
             await self.mcp.add_sse_client(
                 tool["client_id"], tool["url"], tool["headers"]
@@ -87,11 +89,12 @@ class ToolCallContextHelper:
         if self.agent.next_step_prompt:
             user_msg = Message.user_message(self.agent.next_step_prompt)
             self.agent.messages += [user_msg]
-
+        system_msgs = Message.system_message(SYSTEM_PROMPT)
         try:
             # Get response with tool options
             response = await self.agent.llm.ask_tool(
                 messages=self.agent.messages,
+                system_msgs=[system_msgs],
                 tools=self.available_tools.to_params(),
                 tool_choice=self.tool_choices,
             )

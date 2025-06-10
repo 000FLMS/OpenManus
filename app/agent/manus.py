@@ -6,7 +6,6 @@ from typing import Any, List, Optional, Union
 from pydantic import BaseModel, Field, model_validator
 
 from app.agent.base import AgentState, BaseAgentEvents
-from app.agent.browser import BrowserContextHelper
 from app.agent.react import ReActAgent
 from app.context.browser import BrowserContextHelper
 from app.context.toolcall import ToolCallContextHelper
@@ -264,147 +263,147 @@ class Manus(ReActAgent):
                 "Agent: _user_input_event not initialized when receiving input."
             )
 
-    async def run(self, request: Optional[str] = None) -> str:
-        """Execute the agent's main loop asynchronously. But add user input handling.
+    # async def run(self, request: Optional[str] = None) -> str:
+    #     """Execute the agent's main loop asynchronously. But add user input handling.
 
-        Args:
-            request: Optional initial user request to process.
+    #     Args:
+    #         request: Optional initial user request to process.
 
-        Returns:
-            A string summarizing the execution results.
+    #     Returns:
+    #         A string summarizing the execution results.
 
-        Raises:
-            RuntimeError: If the agent is not in IDLE state at start.
-        """
-        if self.state != AgentState.IDLE:
-            raise RuntimeError(f"Cannot run agent from state: {self.state}")
+    #     Raises:
+    #         RuntimeError: If the agent is not in IDLE state at start.
+    #     """
+    #     if self.state != AgentState.IDLE:
+    #         raise RuntimeError(f"Cannot run agent from state: {self.state}")
 
-        self.emit(BaseAgentEvents.LIFECYCLE_START, {"request": request})
+    #     self.emit(BaseAgentEvents.LIFECYCLE_START, {"request": request})
 
-        results: List[str] = []
-        self.emit(BaseAgentEvents.LIFECYCLE_PREPARE_START, {})
-        await self.prepare()
-        self.emit(BaseAgentEvents.LIFECYCLE_PREPARE_COMPLETE, {})
-        async with self.state_context(AgentState.RUNNING):
-            if request:
-                await self.update_memory("user", request)
-                if self.should_plan:
-                    await self.plan()
+    #     results: List[str] = []
+    #     self.emit(BaseAgentEvents.LIFECYCLE_PREPARE_START, {})
+    #     await self.prepare()
+    #     self.emit(BaseAgentEvents.LIFECYCLE_PREPARE_COMPLETE, {})
+    #     async with self.state_context(AgentState.RUNNING):
+    #         if request:
+    #             await self.update_memory("user", request)
+    #             if self.should_plan:
+    #                 await self.plan()
 
-            while (
-                self.current_step < self.max_steps and self.state != AgentState.FINISHED
-            ):
-                self.current_step += 1
-                logger.info(
-                    f"Agent: Executing step {self.current_step}/{self.max_steps}"
-                )
+    #         while (
+    #             self.current_step < self.max_steps and self.state != AgentState.FINISHED
+    #         ):
+    #             self.current_step += 1
+    #             logger.info(
+    #                 f"Agent: Executing step {self.current_step}/{self.max_steps}"
+    #             )
 
-                # Pass the input received from the last pause to the current step's thinking phase
-                if hasattr(self, "_next_user_input"):  # Ensure attribute exists
-                    self._pending_input_for_think = self._next_user_input
-                    self._next_user_input = None  # Consume
+    #             # Pass the input received from the last pause to the current step's thinking phase
+    #             if hasattr(self, "_next_user_input"):  # Ensure attribute exists
+    #                 self._pending_input_for_think = self._next_user_input
+    #                 self._next_user_input = None  # Consume
 
-                try:
-                    step_result = await self.step()
-                except Exception as e:
-                    raise
+    #             try:
+    #                 step_result = await self.step()
+    #             except Exception as e:
+    #                 raise
 
-                # Check for stuck state
-                if self.is_stuck():
-                    self.emit(BaseAgentEvents.STATE_STUCK_DETECTED, {})
-                    self.handle_stuck_state()
+    #             # Check for stuck state
+    #             if self.is_stuck():
+    #                 self.emit(BaseAgentEvents.STATE_STUCK_DETECTED, {})
+    #                 self.handle_stuck_state()
 
-                results.append(f"Step {self.current_step}: {step_result}")
+    #             results.append(f"Step {self.current_step}: {step_result}")
 
-                if self.should_terminate:
-                    self.state = AgentState.FINISHED
-                    logger.info(
-                        f"Agent: Terminating after step {self.current_step} due to internal signal."
-                    )
-                    break
+    #             if self.should_terminate:
+    #                 self.state = AgentState.FINISHED
+    #                 logger.info(
+    #                     f"Agent: Terminating after step {self.current_step} due to internal signal."
+    #                 )
+    #                 break
 
-                # Pause for user input if more steps are allowed and agent not terminated
-                if self.current_step < self.max_steps:
-                    self.emit(
-                        "agent_paused_for_input",
-                        {
-                            "current_step": self.current_step,
-                            "max_steps": self.max_steps,
-                            "message": "Agent is waiting for your input to proceed.",
-                        },
-                    )
-                    if hasattr(self, "_user_input_event"):
-                        self._user_input_event.clear()
-                    else:  # Should not happen if prepare is called
-                        logger.error(
-                            "Agent: _user_input_event not initialized before pause."
-                        )
-                        self._user_input_event = asyncio.Event()  # Defensive init
+    #             # Pause for user input if more steps are allowed and agent not terminated
+    #             if self.current_step < self.max_steps:
+    #                 self.emit(
+    #                     "agent_paused_for_input",
+    #                     {
+    #                         "current_step": self.current_step,
+    #                         "max_steps": self.max_steps,
+    #                         "message": "Agent is waiting for your input to proceed.",
+    #                     },
+    #                 )
+    #                 if hasattr(self, "_user_input_event"):
+    #                     self._user_input_event.clear()
+    #                 else:  # Should not happen if prepare is called
+    #                     logger.error(
+    #                         "Agent: _user_input_event not initialized before pause."
+    #                     )
+    #                     self._user_input_event = asyncio.Event()  # Defensive init
 
-                    logger.info(
-                        f"Agent: Step {self.current_step} completed. Pausing for user input."
-                    )
-                    # await self._user_input_event.wait()  # Actual pause
-                    input_str = input("Enter your input: ")
-                    self._next_user_input = input_str
-                    logger.info(
-                        f"Agent: Resumed by user. Input for next step ({self.current_step + 1 if self.current_step < self.max_steps else 'final'}): '{self._next_user_input}'"
-                    )
+    #                 logger.info(
+    #                     f"Agent: Step {self.current_step} completed. Pausing for user input."
+    #                 )
+    #                 # await self._user_input_event.wait()  # Actual pause
+    #                 input_str = input("Enter your input: ")
+    #                 self._next_user_input = input_str
+    #                 logger.info(
+    #                     f"Agent: Resumed by user. Input for next step ({self.current_step + 1 if self.current_step < self.max_steps else 'final'}): '{self._next_user_input}'"
+    #                 )
 
-                    # Check if user input signals termination
-                    if (
-                        isinstance(self._next_user_input, str)
-                        and self._next_user_input.lower() == "terminate"
-                    ):
-                        self.should_terminate = True
-                        self.state = AgentState.FINISHED  # Ensure state is FINISHED
-                        logger.info(
-                            "Agent: Termination signal 'terminate' received from user input."
-                        )
-                        break  # Exit the loop
-                # If self.current_step == self.max_steps, loop condition handles exit in the next iteration
-            # End of while loop
+    #                 # Check if user input signals termination
+    #                 if (
+    #                     isinstance(self._next_user_input, str)
+    #                     and self._next_user_input.lower() == "terminate"
+    #                 ):
+    #                     self.should_terminate = True
+    #                     self.state = AgentState.FINISHED  # Ensure state is FINISHED
+    #                     logger.info(
+    #                         "Agent: Termination signal 'terminate' received from user input."
+    #                     )
+    #                     break  # Exit the loop
+    #             # If self.current_step == self.max_steps, loop condition handles exit in the next iteration
+    #         # End of while loop
 
-            # Handle max steps reached (user's specific logic from diff)
-            if (
-                self.current_step >= self.max_steps
-                and self.state != AgentState.FINISHED
-            ):
-                self.current_step = 0  # User's change
-                self.state = AgentState.IDLE  # User's change
-                self.emit(
-                    BaseAgentEvents.STEP_MAX_REACHED, {"max_steps": self.max_steps}
-                )
-                results.append(f"Terminated: Reached max steps ({self.max_steps})")
-                # If max_steps is reached, it's a form of completion.
-                # If should_terminate is not set, LIFECYCLE_COMPLETE will be emitted.
+    #         # Handle max steps reached (user's specific logic from diff)
+    #         if (
+    #             self.current_step >= self.max_steps
+    #             and self.state != AgentState.FINISHED
+    #         ):
+    #             self.current_step = 0  # User's change
+    #             self.state = AgentState.IDLE  # User's change
+    #             self.emit(
+    #                 BaseAgentEvents.STEP_MAX_REACHED, {"max_steps": self.max_steps}
+    #             )
+    #             results.append(f"Terminated: Reached max steps ({self.max_steps})")
+    #             # If max_steps is reached, it's a form of completion.
+    #             # If should_terminate is not set, LIFECYCLE_COMPLETE will be emitted.
 
-        if self.should_terminate or self.state == AgentState.FINISHED:
-            self.emit(
-                BaseAgentEvents.LIFECYCLE_TERMINATED,
-                {
-                    "total_input_tokens": (
-                        self.llm.total_input_tokens if self.llm else 0
-                    ),
-                    "total_completion_tokens": (
-                        self.llm.total_completion_tokens if self.llm else 0
-                    ),
-                },
-            )
-        else:  # This includes the case where max_steps was reached and state became IDLE
-            self.emit(
-                BaseAgentEvents.LIFECYCLE_COMPLETE,
-                {
-                    "results": results,
-                    "total_input_tokens": (
-                        self.llm.total_input_tokens if self.llm else 0
-                    ),
-                    "total_completion_tokens": (
-                        self.llm.total_completion_tokens if self.llm else 0
-                    ),
-                },
-            )
-        return "\n".join(results) if results else "No steps executed"
+    #     if self.should_terminate or self.state == AgentState.FINISHED:
+    #         self.emit(
+    #             BaseAgentEvents.LIFECYCLE_TERMINATED,
+    #             {
+    #                 "total_input_tokens": (
+    #                     self.llm.total_input_tokens if self.llm else 0
+    #                 ),
+    #                 "total_completion_tokens": (
+    #                     self.llm.total_completion_tokens if self.llm else 0
+    #                 ),
+    #             },
+    #         )
+    #     else:  # This includes the case where max_steps was reached and state became IDLE
+    #         self.emit(
+    #             BaseAgentEvents.LIFECYCLE_COMPLETE,
+    #             {
+    #                 "results": results,
+    #                 "total_input_tokens": (
+    #                     self.llm.total_input_tokens if self.llm else 0
+    #                 ),
+    #                 "total_completion_tokens": (
+    #                     self.llm.total_completion_tokens if self.llm else 0
+    #                 ),
+    #             },
+    #         )
+    #     return "\n".join(results) if results else "No steps executed"
 
     async def cleanup(self):
         """Clean up Manus agent resources."""
