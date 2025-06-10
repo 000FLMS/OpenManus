@@ -21,7 +21,7 @@ import { getImageUrl } from '@/lib/image';
 import Image from 'next/image';
 import { useAsync } from '@/hooks/use-async';
 import { Button } from '@/components/ui/button';
-import { useEffect, useState } from 'react';
+import { JSX, useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { FilePreviewContainer } from '@/components/features/chat/preview/preview-content/file-preview-container';
 import { FilePreviewPluginManager } from '@/components/features/chat/preview/preview-content/file-preview-plugin-manager';
@@ -93,32 +93,91 @@ export const PreviewContent = ({ messages }: { messages: Message[] }) => {
             )}
 
             {result ? (
-              <div className="space-y-2">
+              <div className="space-y-4">
                 <div className="text-muted-foreground flex items-center gap-2 text-sm font-medium">
                   <ArrowRightIcon className="h-3.5 w-3.5" />
                   <span>Result</span>
                 </div>
-                <div
-                  className={cn(
-                    'bg-muted/40 text-foreground overflow-hidden rounded-md border',
-                    typeof result === 'string' && result.length > 1000 ? 'max-h-96' : '',
-                  )}
-                >
-                  <SyntaxHighlighter
-                    language="json"
-                    showLineNumbers
-                    style={githubGist}
-                    customStyle={{
-                      color: 'inherit',
-                      backgroundColor: 'inherit',
-                      fontSize: '0.875rem',
-                      lineHeight: '1.5',
-                      margin: 0,
-                      borderRadius: 0,
-                    }}
-                  >
-                    {result}
-                  </SyntaxHighlighter>
+                <div className="bg-muted/40 text-foreground overflow-hidden rounded-md border p-4">
+                  {typeof result === 'string' && (() => {
+                    try {
+                      const parsedResult = JSON.parse(result);
+
+                      const renderContent = (data: any): JSX.Element => {
+                        if (Array.isArray(data)) {
+                          return (
+                            <div className="space-y-4">
+                              {data.map((item, index) => (
+                                <div key={index} className="bg-muted/20 rounded-md p-2">
+                                  {renderContent(item)}
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        } else if (typeof data === 'object' && data !== null) {
+                          return (
+                            <div className="space-y-4">
+                              {Object.entries(data).map(([key, value]) => (
+                                <div key={key} className="flex flex-col gap-1">
+                                  <div className="text-muted-foreground text-xs font-medium">{key}</div>
+                                  <div className="bg-muted/20 rounded-md p-2 text-sm">
+                                    {renderContent(value)}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        } else if (typeof data === 'string' && data.startsWith('http')) {
+                          return (
+                            <div className="flex flex-col gap-2">
+                              <a href={data} target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">
+                                {data}
+                              </a>
+                              {data.match(/\.(jpg|jpeg|png|gif|bmp|svg|webp)$/i) ? (
+                                <Image
+                                  src={data}
+                                  alt="Preview"
+                                  width={800}
+                                  height={600}
+                                  className="h-auto w-full object-contain rounded-md border"
+                                  unoptimized
+                                />
+                              ) : (
+                                <iframe
+                                  src={data}
+                                  title="Website Preview"
+                                  className="h-96 w-full rounded-md border"
+                                  sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+                                />
+                              )}
+                            </div>
+                          );
+                        } else {
+                          return <div>{String(data)}</div>;
+                        }
+                      };
+
+                      return renderContent(parsedResult);
+                    } catch {
+                      return (
+                        <SyntaxHighlighter
+                          language="json"
+                          showLineNumbers
+                          style={githubGist}
+                          customStyle={{
+                            color: 'inherit',
+                            backgroundColor: 'inherit',
+                            fontSize: '0.875rem',
+                            lineHeight: '1.5',
+                            margin: 0,
+                            borderRadius: 0,
+                          }}
+                        >
+                          {result}
+                        </SyntaxHighlighter>
+                      );
+                    }
+                  })()}
                 </div>
               </div>
             ) : (
@@ -353,7 +412,7 @@ const WorkspacePreview = () => {
         <CardContent>
           <div className="overflow-hidden rounded-md border">
             {workspace instanceof Blob &&
-            (workspace.type.includes('image') || (data?.type === 'workspace' && data.path?.match(/\.(jpg|jpeg|png|gif|bmp|svg|webp)$/i))) ? (
+              (workspace.type.includes('image') || (data?.type === 'workspace' && data.path?.match(/\.(jpg|jpeg|png|gif|bmp|svg|webp)$/i))) ? (
               <Image
                 src={URL.createObjectURL(workspace)}
                 alt={data?.type === 'workspace' ? data.path || 'File preview' : 'File preview'}

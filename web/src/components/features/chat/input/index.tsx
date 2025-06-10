@@ -109,11 +109,11 @@ export const ChatInput = ({ status = 'idle', onSubmit, onTerminate, taskId }: Ch
   };
 
   const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/share/tasks/${taskId}` : '';
-
+  console.log('status:', status);
   return (
     <div className="pointer-events-none absolute right-0 bottom-0 left-0 p-4">
       <div className="pointer-events-auto mx-auto flex w-full max-w-2xl flex-col gap-2">
-        {status !== 'idle' && (
+        {(
           <div className="flex justify-center gap-2">
             <Button
               variant="outline"
