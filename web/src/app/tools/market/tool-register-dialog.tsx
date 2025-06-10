@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { url } from 'inspector';
 import { forwardRef, useImperativeHandle, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -20,7 +21,7 @@ export interface ToolRegisterDialogRef {
   showRegister: () => void;
 }
 
-const commandTypes = ['docker', 'npx', 'uvx'] as const;
+const commandTypes = ['docker', 'npx', 'uvx', 'sse'] as const;
 
 interface BasicInfoFormProps {
   form: ReturnType<typeof useForm<z.infer<typeof basicInfoSchema>>>;
@@ -124,6 +125,19 @@ const TechnicalConfigForm = ({ form, onSubmit }: TechnicalConfigFormProps) => {
             </FormItem>
           )}
         />
+        <FormField
+          control={form.control}
+          name="url"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>SSE Url (Url link)</FormLabel>
+              <FormControl>
+                <Textarea placeholder="Enter a sse url link" className="min-h-[150px] font-mono" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
         <Button type="submit" className="w-full">
           Register
         </Button>
@@ -167,6 +181,7 @@ const technicalConfigSchema = z.object({
       message: 'Invalid JSON format for envSchema',
     },
   ),
+  url: z.string(),
 });
 
 export const ToolRegisterDialog = forwardRef<ToolRegisterDialogRef, ToolRegisterDialogProps>(({ onSuccess }, ref) => {
@@ -187,6 +202,7 @@ export const ToolRegisterDialog = forwardRef<ToolRegisterDialogRef, ToolRegister
       command: 'docker',
       args: '',
       envSchema: '',
+      url: '',
     },
   });
 
@@ -207,6 +223,7 @@ export const ToolRegisterDialog = forwardRef<ToolRegisterDialogRef, ToolRegister
         command: values.command,
         args: JSON.parse(values.args),
         envSchema: JSON.parse(values.envSchema),
+        url: values.url,
       };
 
       await registerTool(toolData);

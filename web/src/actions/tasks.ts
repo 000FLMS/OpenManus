@@ -81,6 +81,8 @@ export const createTask = withUserAuth(async ({ organization, args }: AuthWrappe
     return tool;
   });
 
+  console.log('Processed Tools:', processedTools);
+
   // Create task
   const task = await prisma.tasks.create({
     data: {
@@ -166,12 +168,18 @@ export const restartTask = withUserAuth(
       const orgTool = organizationTools.find(ot => ot.tool.id === tool);
       if (orgTool) {
         const env = orgTool.env ? JSON.parse(decryptLongTextWithPrivateKey(orgTool.env, privateKey)) : {};
+        const query = orgTool.query ? JSON.parse(decryptLongTextWithPrivateKey(orgTool.query, privateKey)) : {};
+        const fullUrl = buildMcpSseFullUrl(orgTool.tool.url, query);
+        const headers = orgTool.headers ? JSON.parse(decryptLongTextWithPrivateKey(orgTool.headers, privateKey)) : {};
+
         return JSON.stringify({
           id: orgTool.tool.id,
           name: orgTool.tool.name,
           command: orgTool.tool.command,
           args: orgTool.tool.args,
           env: env,
+          url: fullUrl,
+          headers: headers,
         });
       }
       return tool;

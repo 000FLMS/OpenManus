@@ -87,7 +87,7 @@ export const closeTool = withUserAuth(async ({ organization, args }: AuthWrapper
 /**
  * get all Tools from marketplace
  */
-export const getToolsInfo = withUserAuth(async ({}: AuthWrapperContext<{}>) => {
+export const getToolsInfo = withUserAuth(async ({ }: AuthWrapperContext<{}>) => {
   const tools = await prisma.tools.findMany({});
   return tools;
 });
@@ -99,8 +99,8 @@ export const getToolsInfo = withUserAuth(async ({}: AuthWrapperContext<{}>) => {
 export const registerTool = withUserAuth(
   async ({
     user,
-    args: { name, description, command, args, envSchema },
-  }: AuthWrapperContext<{ name: string; description: string; command: string; args: string[]; envSchema: JSONSchema }>) => {
+    args: { name, description, command, args, envSchema, url },
+  }: AuthWrapperContext<{ name: string; description: string; command: string; args: string[]; envSchema: JSONSchema; url: string; }>) => {
     const u = await prisma.users.findUnique({ where: { email: user.email } });
     if (!u) {
       throw new Error('User not found');
@@ -116,9 +116,41 @@ export const registerTool = withUserAuth(
     }
 
     await prisma.tools.create({
-      data: { name, description, command, args, envSchema },
+      data: { name, description, command, args, envSchema, url },
     });
 
     return { message: 'Tool registered successfully' };
+  },
+);
+
+/**
+ * delete a tool
+ * only root user can delete a tool
+ */
+export const deleteTool = withUserAuth(
+  async ({
+    organization,
+    args: { toolId },
+  }: AuthWrapperContext<{ toolId: string }>) => {
+
+    const existing = await prisma.organizationTools.findUnique({
+      where: { toolId_organizationId: { toolId: toolId, organizationId: organization.id } },
+    });
+
+    if (existing) {
+      await prisma.organizationTools.delete({
+        where: { toolId_organizationId: { toolId: toolId, organizationId: organization.id } },
+      });
+    }
+
+    const tool = await prisma.tools.findUnique({ where: { id: toolId } });
+
+    if (!tool) {
+      throw new Error('Tool not found');
+    }
+
+    await prisma.tools.delete({ where: { id: toolId } });
+
+    return { message: 'Tool deleted successfully' };
   },
 );

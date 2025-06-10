@@ -194,7 +194,9 @@ class MCPSandboxClients(ToolCollection):
         inst.__init__(client_id=client_id, host=host)
         inst.command_type = get_command_type(command)
         inst.container_name = inst.get_container_name()
-
+        logger.info(
+            f"Connecting to MCP stdio server with command: {command}, args: {args}, env: {env}"
+        )
         if not command:
             raise ValueError("Server command is required.")
         if inst.session:
@@ -228,6 +230,9 @@ class MCPSandboxClients(ToolCollection):
         inst = object.__new__(cls)
         inst.__init__(client_id=client_id, host=host)
 
+        logger.info(
+            f"Connecting to MCP SSE server with URL: {server_url}, headers: {headers}"
+        )
         if not server_url:
             raise ValueError("Server URL is required.")
         if inst.session:
